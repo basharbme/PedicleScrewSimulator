@@ -40,9 +40,9 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
     '''
     def rulerMeasures(self):
       self.rulerList = []
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLine')
       for ruler in rulers:
-        self.rulerList.append("%.2f" % ruler.GetDistanceMeasurement())
+        self.rulerList.append("%.2f" % ruler.GetMeasurement("length").GetValue())
     '''
     def updateTable(self):
       #logging.debug(pNode.GetParameter('vertebrae'))
@@ -100,7 +100,7 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
           self.currentFid = self.angleTable.currentRow()
           self.zoomIn()
           self.sliceChange()
-          self.fiducial.AddObserver('ModifiedEvent', self.fidMove)
+          self.fiducial.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.fidMove)
 
     def fidMove(self, observer, event):
 
@@ -111,44 +111,52 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
     @vtk.calldata_type(vtk.VTK_OBJECT)
     def onNodeAddedRemoved(self, caller, event, calldata):
       node = calldata
-      if isinstance(node, slicer.vtkMRMLAnnotationRulerNode):
+      if isinstance(node, slicer.vtkMRMLMarkupsLineNode):
         self.rulerAdded()
 
     def rulerAdded(self):
       logging.debug("ruler added: {0}".format(self.entryCount))
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLineNode')
 
       rulerX = rulers[-1] # last ruler
-      self.rulerList.append("%.2f" % rulerX.GetDistanceMeasurement())
+      self.rulerList.append("%.2f" % rulerX.GetMeasurement("length").GetValue())
+      rulerX.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.rulerLengthCheck)
+      self.rulerLengthCheck()
 
       for i in range(self.fidNumber):
         #self.measuresLength = qt.QComboBox()
         #self.measuresWidth = qt.QComboBox()
-        self.lengthCombo[i].addItem("%.2f" % rulerX.GetDistanceMeasurement())
-        self.widthCombo[i].addItem("%.2f" % rulerX.GetDistanceMeasurement())
-        #self.rulerLengths.append("%.2f" % rulerX.GetDistanceMeasurement())
+        self.lengthCombo[i].addItem("%.2f" % rulerX.GetMeasurement("length").GetValue())
+        self.widthCombo[i].addItem("%.2f" % rulerX.GetMeasurement("length").GetValue())
+        #self.rulerLengths.append("%.2f" % rulerX.GetMeasurement("length").GetValue())
         #self.angleTable.setCellWidget(i,3, self.measuresLength)
         #self.angleTable.setCellWidget(i,4, self.measuresWidth)
 
-    def rulerLengthCheck(self, observer, event):
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
-      for [i, rulerX] in enumerate(rulers):
-        if rulerX[i].GetDistanceMeasurement() == self.rulerList[i].GetDistanceMeasurement():
-          logging.debug("okay")
-        else:
-          self.lengthCombo[i].removeItem(i)
-          self.widthCombo[i].removeItem(i)
-          self.lengthCombo[i].insertItem(i,"%.2f" % rulerX[i].GetDistanceMeasurement())
-          self.widthCombo[i].insertItem(i, "%.2f" % rulerX[i].GetDistanceMeasurement())
+    def rulerLengthCheck(self, observer=None, event=None):
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLineNode')
+      for i, ruler in enumerate(rulers):
+        length = ruler.GetMeasurement("length").GetValue()
+        lengthStr = "%.2f" % length
+        listIndex = i + 1  # first item in the list is the empty measurement
+        if lengthStr != self.rulerList[i]:
+          for lengthCombo in self.lengthCombo:
+            if listIndex >= lengthCombo.count:
+              lengthCombo.addItem(lengthStr)
+            else:
+              lengthCombo.setItemText(listIndex, lengthStr)
+        for widthCombo in self.widthCombo:
+          if listIndex >= widthCombo.count:
+            widthCombo.addItem(lengthStr)
+          else:
+            widthCombo.setItemText(listIndex, lengthStr)
 
-
-      #self.rulerList.append("%.2f" % rulerX.GetDistanceMeasurement())
+      #self.rulerList.append("%.2f" % rulerX.GetMeasurement("length").GetValue())
 
     def sliceChange(self):
         logging.debug("changing")
         coords = [0,0,0]
         if self.fiducial != None:
-          self.fiducial.GetNthFiducialPosition(self.currentFid,coords)
+          self.fiducial.GetNthControlPointPosition(self.currentFid,coords)
           slicer.modules.markups.logic().JumpSlicesToLocation(coords[0], coords[1], coords[2], True)
         else:
             return
@@ -194,8 +202,8 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
       #slicer.app.applicationLogic().PropagateVolumeSelection(1)
       selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
       # place rulers
-      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLAnnotationRulerNode")
-      # to place ROIs use the class name vtkMRMLAnnotationROINode
+      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsLineNode")
+      # to place ROIs use the class name vtkMRMLMarkupsLineNode
       interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
       placeModePersistence = 1
       interactionNode.SetPlaceModePersistence(placeModePersistence)
@@ -205,8 +213,8 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
     def stop(self):
       selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
       # place rulers
-      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLAnnotationRulerNode")
-      # to place ROIs use the class name vtkMRMLAnnotationROINode
+      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsLineNode")
+      # to place ROIs use the class name vtkMRMLMarkupsLineNode
       interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
       placeModePersistence = 1
       interactionNode.SetPlaceModePersistence(placeModePersistence)
@@ -227,14 +235,10 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
       slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.NodeAddedEvent, self.onNodeAddedRemoved)
       slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.NodeRemovedEvent, self.onNodeAddedRemoved)
 
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLineNode')
       for ruler in rulers:
-        ruler.AddObserver('ModifiedEvent', self.rulerLengthCheck)
+        ruler.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.rulerLengthCheck)
 
-      '''
-      rs = slicer.mrmlScene.GetNodeByID('vtkMRMLAnnotationRulerNode1')
-      rs.AddObserver('ModifiedEvent', a)
-      '''
       self.__layout = self.__parent.createUserInterface()
       #slicer.app.applicationLogic().PropagateVolumeSelection()
 
@@ -343,11 +347,11 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
       # Layout
       reconLayout = qt.QFormLayout(reconCollapsibleButton)
 
-      #label for ROI selector
+      #label for slice selector
       reconLabel = qt.QLabel( 'Recon Slice:' )
       rotationLabel = qt.QLabel( 'Rotation Angle:' )
 
-      #creates combobox and populates it with all vtkMRMLAnnotationROINodes in the scene
+      #creates combobox and populates it with all slice nodes in the scene
       self.selector = slicer.qMRMLNodeComboBox()
       self.selector.nodeTypes = ['vtkMRMLSliceNode']
       self.selector.toolTip = "Change Slice Reconstruction"
@@ -457,9 +461,9 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
       for viewNode in viewNodes:
         viewNode.SetSliceIntersectionVisibility(1)
 
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLineNode')
       for rulerX in rulers:
-        rulerX.SetDisplayVisibility(1)
+        rulerX.GetDisplayNode().SetVisibility(True)
 
       if self.entryCount == 1:
         self.updateTable()
@@ -474,9 +478,9 @@ class MeasurementsStep( PedicleScrewSimulatorStep ):
       for viewNode in viewNodes:
         viewNode.SetSliceIntersectionVisibility(0)
 
-      rulers = slicer.util.getNodesByClass('vtkMRMLAnnotationRulerNode')
+      rulers = slicer.util.getNodesByClass('vtkMRMLMarkupsLineNode')
       for rulerX in rulers:
-        rulerX.SetDisplayVisibility(0)
+        rulerX.GetDisplayNode().SetVisibility(False)
 
       if goingTo.id() == 'Screw':
         logging.debug("screw")

@@ -405,6 +405,7 @@ class ScrewStep(PedicleScrewSimulatorStep):
             self.fidNode.GetNthFiducialPosition(self.currentFidIndex,self.coords)
             logging.debug("Current fid index = {0}, label = {1}, coords = {2}".format(
               self.currentFidIndex, self.currentFidLabel, self.coords))
+            self.updateMeasurements()
             self.combo_chosen()
 
 

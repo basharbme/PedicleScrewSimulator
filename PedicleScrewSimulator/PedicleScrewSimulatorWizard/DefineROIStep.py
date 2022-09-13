@@ -123,9 +123,9 @@ class DefineROIStep( PedicleScrewSimulatorStep ) :
     roiLabel.setFont(font)
 
 
-    #creates combobox and populates it with all vtkMRMLAnnotationROINodes in the scene
+    #creates combobox and populates it with all vtkMRMLMarkupsROINodes in the scene
     self.__roiSelector = slicer.qMRMLNodeComboBox()
-    self.__roiSelector.nodeTypes = ['vtkMRMLAnnotationROINode']
+    self.__roiSelector.nodeTypes = ['vtkMRMLMarkupsROINode']
     self.__roiSelector.toolTip = "ROI defining the structure of interest"
     self.__roiSelector.setMRMLScene(slicer.mrmlScene)
     self.__roiSelector.addEnabled = 1
@@ -145,7 +145,7 @@ class DefineROIStep( PedicleScrewSimulatorStep ) :
     voiGroupBoxLayout = qt.QFormLayout( voiGroupBox )
 
     # create ROI Widget and add it to the form layout of the GroupBox
-    self.__roiWidget = PythonQt.qSlicerAnnotationsModuleWidgets.qMRMLAnnotationROIWidget()
+    self.__roiWidget = slicer.qMRMLMarkupsROIWidget()
     voiGroupBoxLayout.addRow( self.__roiWidget )
 
     # # Hide VR Details
@@ -210,11 +210,8 @@ class DefineROIStep( PedicleScrewSimulatorStep ) :
       #add observer to ROI. call self.processROIEvents if ROI is altered
       self.__roiObserverTag = self.__roi.AddObserver('ModifiedEvent', self.processROIEvents)
 
-      #enable click and drag functions on ROI
-      roi.SetInteractiveMode(1)
-
       #connect ROI widget to ROI
-      self.__roiWidget.setMRMLAnnotationROINode(roi)
+      self.__roiWidget.setMRMLMarkupsNode(roi)
       self.__roi.SetDisplayVisibility(1)
 
   def processROIEvents(self,node=None,event=None):
@@ -461,7 +458,7 @@ class DefineROIStep( PedicleScrewSimulatorStep ) :
     # there?
     if self.__roi != None:
         self.__roi.RemoveObserver(self.__roiObserverTag)
-        self.__roi.SetDisplayVisibility(0)
+        self.__roi.GetDisplayNode().SetVisibility(0)
 
     if self.__roiSelector.currentNode() != None:
         pNode.SetNodeReferenceID('roiNode', self.__roiSelector.currentNode().GetID())
@@ -500,8 +497,9 @@ class DefineROIStep( PedicleScrewSimulatorStep ) :
   def updateWidgetFromParameterNode(self, parameterNode):
     roiNode = parameterNode.GetNodeReference('roiNode')
     if not roiNode:
-      roiNode = slicer.vtkMRMLAnnotationROINode()
-      roiNode.Initialize(slicer.mrmlScene)
+      roiNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLMarkupsROINode')
+      roiNode.CreateDefaultDisplayNodes()
+      roiNode.GetDisplayNode().SetFillVisibility(False)  # disable filling, it makes the view look less cluttered
       parameterNode.SetNodeReferenceID('roiNode', roiNode.GetID())
       roiNode.SetRadiusXYZ(50, 50, 100)
       # initialize slightly off-center, as spine is usually towards posterior side of the image

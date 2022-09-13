@@ -149,6 +149,7 @@ class GradeStep(PedicleScrewSimulatorStep):
 
       pNode = self.parameterNode()
 
+      self.fiduciallist = []
       self.fidNode = self.fiducialNode()
       for x in range (0,self.fidNode.GetNumberOfFiducials()):
         label = self.fidNode.GetNthFiducialLabel(x)
@@ -213,14 +214,11 @@ class GradeStep(PedicleScrewSimulatorStep):
         pNode = self.parameterNode()
 
         self.__inputScalarVol = pNode.GetNodeReference('croppedBaselineVolume')
-        for x in range(0, len(self.fiduciallist)):
-            fidName = self.fiduciallist[x]
+        for screwIndex in range(0, len(self.fiduciallist)):
+            fidName = self.fiduciallist[screwIndex]
             logging.debug(fidName)
             transformFid = slicer.mrmlScene.GetFirstNodeByName('Transform-%s' % fidName)
-
             screwModel = slicer.mrmlScene.GetFirstNodeByName('Screw at point %s' % fidName)
-            screwIndex = x
-
             if screwModel != None:
                 self.gradeScrew(screwModel, transformFid, fidName, screwIndex)
                 self.screwCount += 1

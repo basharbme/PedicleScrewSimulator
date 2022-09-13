@@ -67,7 +67,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
           currentFid = self.table2.currentRow()
           position = [0,0,0]
           self.fiducial = self.fiducialNode()
-          self.fiducial.GetNthFiducialPosition(currentFid,position)
+          self.fiducial.GetNthControlPointPosition(currentFid,position)
           logging.debug(position)
           self.cameraFocus(position)
 
@@ -75,7 +75,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
     def updateTable(self):
       #logging.debug(pNode.GetParameter('vertebrae'))
       self.fiducial = self.fiducialNode()
-      self.fidNumber = self.fiducial.GetNumberOfFiducials()
+      self.fidNumber = self.fiducial.GetNumberOfDefinedControlPoints()
       logging.debug(self.fidNumber)
       self.fidLabels = []
       self.items = []
@@ -85,7 +85,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
 
 
       for i in range(0,self.fidNumber):
-          self.Label = qt.QTableWidgetItem(self.fiducial.GetNthFiducialLabel(i))
+          self.Label = qt.QTableWidgetItem(self.fiducial.GetNthControlPointLabel(i))
           self.items.append(self.Label)
           self.table2.setItem(i, 0, self.Label)
           self.comboLevel = qt.QComboBox()
@@ -99,10 +99,10 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
     def deleteFiducial(self):
       if self.table2.currentColumn() == 0:
           item = self.table2.currentItem()
-          self.fidNumber = self.fiducial.GetNumberOfFiducials()
+          self.fidNumber = self.fiducial.GetNumberOfDefinedControlPoints()
           self.fiducial = self.fiducialNode()
           for i in range(0,self.fidNumber):
-              if item.text() == self.fiducial.GetNthFiducialLabel(i):
+              if item.text() == self.fiducial.GetNthControlPointLabel(i):
                   deleteIndex = i
           self.fiducial.RemoveMarkup(deleteIndex)
           deleteIndex = -1
@@ -121,7 +121,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
     def addFiducialToTable(self, observer, event):
       logging.debug("Modified - {0}".format(event))
       self.fiducial = self.fiducialNode()
-      self.fidNumber = self.fiducial.GetNumberOfFiducials()
+      self.fidNumber = self.fiducial.GetNumberOfDefinedControlPoints()
       slicer.modules.markups.logic().SetAllMarkupsVisibility(self.fiducial,1)
       logging.debug(self.fidNumber)
       self.fidLabels = []
@@ -132,7 +132,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
 
 
       for i in range(0,self.fidNumber):
-          self.Label = qt.QTableWidgetItem(self.fiducial.GetNthFiducialLabel(i))
+          self.Label = qt.QTableWidgetItem(self.fiducial.GetNthControlPointLabel(i))
           self.items.append(self.Label)
           self.table2.setItem(i, 0, self.Label)
           self.comboLevel = qt.QComboBox()
@@ -170,10 +170,6 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
       self.startMeasurements.placeMultipleMarkups = slicer.qSlicerMarkupsPlaceWidget.ForcePlaceMultipleMarkups
       self.startMeasurements.connect('activeMarkupsFiducialPlaceModeChanged(bool)', self.addFiducials)
       #self.__layout.addWidget(self.startMeasurements)
-
-      #self.stopMeasurements = qt.QPushButton("Stop Placing")
-      #self.stopMeasurements.connect('clicked(bool)', self.stop)
-      #self.__layout.addWidget(self.stopMeasurements)
 
       #self.updateTable2 = qt.QPushButton("Update Table")
       #self.updateTable2.connect('clicked(bool)', self.updateTable)
@@ -285,26 +281,12 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
       camera.ResetClippingRange()
       #pNode = self.parameterNode()
       #pNode.SetParameter('currentStep', self.stepid)
-      '''
-      #roiVolume = pNode.GetNodeReference('croppedBaselineVolume')
-      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-      # place rulers
-      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-      # to place ROIs use the class name vtkMRMLAnnotationROINode
-      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-      placeModePersistence = 1
-      interactionNode.SetPlaceModePersistence(placeModePersistence)
-      # mode 1 is Place, can also be accessed via slicer.vtkMRMLInteractionNode().Place
-      interactionNode.SetCurrentInteractionMode(1)
-      '''
 
       fiducialNode = self.fiducialNode()
       self.startMeasurements.setCurrentNode(fiducialNode)
-      if slicer.app.majorVersion>4 or (slicer.app.majorVersion == 4 and slicer.app.minorVersion > 10):
-        self.fiducialNodeObservations.append(fiducialNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.addFiducialToTable))
-      else:
-        # backward compatibility for Slicer-4.10 and earlier
-        self.fidObserve = fiducialNode.AddObserver('ModifiedEvent', self.addFiducialToTable)
+      self.fiducialNodeObservations.append(fiducialNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.addFiducialToTable))
+      self.fiducialNodeObservations.append(fiducialNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointPositionUndefinedEvent, self.addFiducialToTable))
+
       if comingFrom.id() == 'DefineROI':
           self.updateTable()
 
@@ -329,17 +311,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
           return
 
       super(LandmarksStep, self).onExit(goingTo, transitionType)
-      '''
-      selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-      # place rulers
-      selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-      # to place ROIs use the class name vtkMRMLAnnotationROINode
-      interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-      placeModePersistence = 1
-      interactionNode.SetPlaceModePersistence(placeModePersistence)
-      # mode 1 is Place, can also be accessed via slicer.vtkMRMLInteractionNode().Place
-      interactionNode.SetCurrentInteractionMode(2)
-      '''
+
     def validate( self, desiredBranchId ):
 
       self.__parent.validate( desiredBranchId )
@@ -347,7 +319,7 @@ class LandmarksStep( PedicleScrewSimulatorStep ):
 
       #self.inputFiducialsNodeSelector.update()
       #fid = self.inputFiducialsNodeSelector.currentNode()
-      fidNumber = self.fiducial.GetNumberOfFiducials()
+      fidNumber = self.fiducial.GetNumberOfDefinedControlPoints()
 
       #pNode = self.parameterNode()
       if fidNumber != 0:
